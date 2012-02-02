@@ -1,0 +1,271 @@
+<html>
+  <head lang="en-US">
+
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=1024, user-scalable=no" />
+
+    <title>Node.js @Joyent (Seattle Node.js Meetup 2012-02-02)</title>
+
+    <link rel="stylesheet" href="deck.js/core/deck.core.css">
+    <link rel="stylesheet" href="deck.js/extensions/goto/deck.goto.css">
+    <link rel="stylesheet" href="deck.js/extensions/menu/deck.menu.css">
+    <link rel="stylesheet" href="deck.js/extensions/navigation/deck.navigation.css">
+    <link rel="stylesheet" href="deck.js/extensions/status/deck.status.css">
+    <link rel="stylesheet" href="deck.js/extensions/hash/deck.hash.css">
+
+    <link rel="stylesheet" href="deck.js/themes/style/swiss.css">
+    <link rel="stylesheet" href="deck.js/extensions/codemirror/deck.codemirror.css">
+    <link rel="stylesheet" href="deck.js/extensions/codemirror/themes/default.css">
+
+    <link rel="stylesheet" id="transition-theme-link" href="deck.js/themes/transition/horizontal-slide.css">
+
+    <link rel="stylesheet" href="index.css">
+    <script src="deck.js/modernizr.custom.js"></script>
+  </head>
+  <body>
+    <article class="deck-container">
+
+
+      <section class="slide" id="intro">
+        <h1 id="title">
+	  <a class="titlelink" href="http://nodejs.org">Node.js</a>
+          at
+          <a class="titlelink" href="http://www.joyent.com">Joyent</a>
+	</h1>
+        <h2>Looking under the hood</h2>
+	<h3><a href="https://github.com/mcavage">Mark Cavage</a></h3>
+	<h3><a href="http://www.meetup.com/Seattle-Node-js//">Seattle Node.js</a> February 02, 2012</h3>
+      </section>
+
+
+      <section class="slide" id="whoami">
+        <h2>Who am I and why do you care about this talk?</h2>
+        <h3>Just a Distributed/Systems Programmer</h3>
+        <p>
+          I've had Various systems/network/application jobs at Nortel, IBM,
+          Amazon (AWS); I now work for Joyent (and we just opened an office
+          here in Seattle!).
+        </p>
+        <p>
+          Blah blah, that's largely irrelevant. What is relevant is that Joyent
+          is using node <b>a lot</b> in a fairly non-standard way: we're
+          shipping "shrink-wrapped" low-level systems software on it.  This talk
+          will be a quick walk-through of some highlights I thought notable.
+        </p>
+      </section>
+
+
+      <section class="slide" id="aboutjoyent">
+        <h2>About Joyent</h2>
+        <ul>
+          <li>
+            <h3>SmartOS</h3>
+            <p><a href="http://www.smartos.org">Smartos</a> is our own OS
+              offering based on Illumos (fork of OpenSolaris).  We build
+              everything on this, as it gets us ZFS, DTrace and Zones.
+            </p>
+          </li>
+          <li>
+            <h3>Node.js</h3>
+            <p>If you didn't already know, we're the key contributor to
+              <a href="http://nodejs.org">Node.js</a>.
+            </p>
+          </li>
+          <li>
+            <h3>SmartDataCenter</h3>
+            <p><a href="http://www.joyent.com/products/smartdatacenter/">
+                SmartDataCenter</a> is the software written for the
+              <a href="http://www.joyentcloud.com">Joyent Cloud</a>
+              available in your own datacenter.  The rest of this talk is about
+              that.
+            </p>
+          </li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="sdcarchitecture">
+        <h2>Overview of SmartDataCenter</h2>
+        <img src="images/sdc.png" />
+        <p class="caption">
+          SmartDataCenter is actually a slew of what would be standalone
+          management products unified together.  It's basically a turn-key
+          offering that has provisioning, billing, monitoring, analytics,
+          APIs, Portals, ...
+        </p>
+      </section>
+
+
+      <section class="slide" id="portal">
+        <h2>Customer Portal</h2>
+        <img src="images/portal.jpg" />
+        <p class="caption">
+          Our customer portal is written in
+          <a href="http://expressjs.org">express</a> for content genation, and
+          <a href="http://mcavage.github.com/node-restify/v1.0/guide.html">restify</a>
+          for client calls to <a href="https://us-west-1.api.joyentcloud.com/">CloudAPI</a>.
+        </p>
+      </section>
+
+
+      <section class="slide" id="cloudapi">
+        <h2>CloudAPI</h2>
+        <ul>
+          <li>
+            <h3>Public REST API</h3>
+            <p><a href="https://us-west-1.api.joyentcloud.com/">CloudAPI</a> is
+            our customer available REST API.  Supports management of
+              credentials, machines and analytics.</p>
+          </li>
+          <li>
+            <h3>Transforming proxy</h3>
+            <p>Written to not actually keep state, it proxies to all of
+              our internal APIs and offers a unified interface.
+            </p>
+          </li>
+          <li>
+            <h3>Offers a Node.js SDK</h3>
+            <p>Uses <a href="http://mcavage.github.com/node-restify/v1.0/guide.html">restify</a>,
+              <a href="https://github.com/joyent/node-http-signature">http-signature</a>,
+              and <a href="https://github.com/rmustacc/node-ctype">ctype</a> (to
+              work with the SSH agent).
+            </p>
+          </li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="ufds">
+        <h2>UFDS: LDAP from scratch</h2>
+        <img src="images/ufds.png" />
+        <p class="caption">Highly scalable directory service. Leverages
+          <a href="http://ldapjs.org">ldapjs</a> and
+          <a href="http://mcavage.github.com/node-ldapjs-riak/">ldapjs-riak</a>.
+          Holds customers, credentials, config; basically a pile of shit you'd
+          expect in a directory service.
+        </p>
+      </section>
+
+
+      <section class="slide" id="ca">
+        <h2>Cloud Analytics: DTrace in the sky</h2>
+        <img src="images/ca.png" />
+        <p class="caption">Entire system is big, but leverages ctype, amqp,
+          libGeoIP, libdtrace, and others.
+        </p>
+      </section>
+
+
+      <section class="slide" id="booter">
+        <h2>DHCP Server in 511 lines of JS</h2>
+        <ul>
+          <li>
+            <h3>Control server boots</h3>
+            <p>We need to talk to our own internal systems to figure out IPs
+              and build a pxegrub menu.</p>
+          </li>
+          <li>
+            <h3>Uses node's <a href="http://nodejs.org/docs/v0.6.9/api/dgram.html">dgram</a> API</h3>
+            <p>And some other internal libraries, but that's pretty much it!</p>
+          </li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="agents">
+        <h2>A crapload of helper services</h2>
+        <ul>
+          <li>
+            <h3>We have a slew of lightweight agents on every node</h3>
+            <p>Things like heartbeating, provisioning, metering, monitoring,
+              and metadata.</p>
+          </li>
+          <li>
+            <h3>Lots of cross-hypervisor calls</h3>
+            <p>
+              <a href="https://github.com/mcavage/node-zsock">zsock</a> lets us
+              open communiation channels in a tenant's virtualization containe.
+              (SmartOS gets most of the credit here...)</p>
+          </li>
+          <li>
+            <h3>Lots of
+              <a href="https://github.com/rmustacc/node-ctype">ctype</a>
+              usage.</h3>
+            <p>For example, translating VMDKs into something our hypervisor can
+              use.</p>
+            </li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="jsontool">
+        <h2>Stuff we couldn't live without</h2>
+        <ul>
+          <li>
+            <h3><a href="https://github.com/trentm/json">jsontool</a></h3>
+            <p>Probably used more times per day than anything else.</p>
+          </li>
+          <li>
+            <h3><a href="https://github.com/chrisa/node-dtrace-provider">dtrace-provider</a></h3>
+            <p>Lets us get real-time analytics from JS</p>
+          </li>
+          <li>
+            <h3><a href="https://github.com/bnoordhuis/node-buffertools">buffertools</a></h3>
+            <p>Adds some nice helpers to the Buffers API</p>
+          </li>
+          <li>
+            <h3><a href="https://github.com/isaacs">Isaac's page</a></h3>
+            <p>Last but not least, Isaac's stuff, like tap, semver, lru-cache, ...</p>
+          </li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="endoftalk">
+        <h2>Questions?</h2>
+	<img src="images/questions.jpg" />
+      </section>
+
+      <a href="#" class="deck-prev-link" title="Previous">&#8592;</a>
+      <a href="#" class="deck-next-link" title="Next">&#8594;</a>
+
+      <p class="deck-status">
+        <span class="deck-status-current"></span>
+        /
+        <span class="deck-status-total"></span>
+      </p>
+
+      <form action="." method="get" class="goto-form">
+        <label for="goto-slide">Go to slide:</label>
+        <input type="number" name="slidenum" id="goto-slide">
+        <input type="submit" value="Go">
+      </form>
+
+      <a href="." title="Permalink to this slide" class="deck-permalink">#</a>
+    </article>
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.js"></script>
+    <script>window.jQuery || document.write('<script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.6.1.min.js">\x3C/script>')</script>
+
+<!-- Deck Core and extensions -->
+<script src="deck.js/core/deck.core.js"></script>
+<script src="deck.js/extensions/menu/deck.menu.js"></script>
+<script src="deck.js/extensions/goto/deck.goto.js"></script>
+<script src="deck.js/extensions/status/deck.status.js"></script>
+<script src="deck.js/extensions/navigation/deck.navigation.js"></script>
+<script src="deck.js/extensions/hash/deck.hash.js"></script>
+
+<!-- include the base codemirror code. -->
+<script src="deck.js/extensions/codemirror/codemirror.js"></script>
+
+<!-- include the code syntax you want to highlight -->
+<script src="deck.js/extensions/codemirror/mode/javascript/javascript.js"></script>
+<script src="deck.js/extensions/codemirror/mode/yaml/yaml.js"></script>
+
+<script src="deck.js/extensions/codemirror/deck.codemirror.js"></script>
+
+<!-- Stuff specific to this page -->
+<script src="index.js"></script>
+
+</body>
+</html>
