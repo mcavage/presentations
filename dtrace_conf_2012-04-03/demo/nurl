@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+// -*- mode: js -*-
+
+var http = require('http');
+var https = require('https');
+var url = require('url');
+
+var dtp = require('dtrace-provider').createDTraceProvider('nurl');
+
+// id, host, port, path
+dtp.addProbe('http-get-start', 'int', 'char *', 'int', 'char *');
+// id, status, content-type, content-length
+dtp.addProbe('http-get-done', 'int', 'int', 'char *', 'int');
+// id, message
+dtp.addProbe('http-get-error', 'int', 'char *');
+
+
+var DID = 0;
+function dtraceID() {
+    if (++DID >= 4294967295)
+        DID = 1;
+
+    return DID;
+}
+
+
+function get(location) {
+    var did = dtraceID();
+    var tmp = url.parse(location);
+    var options = {
+        host: tmp.hostname,
+        port: tmp.port || 80,
+        path: tmp.path || '/'
+    };
+
+    dtp.fire('http-get-start', function () {
+        return [did, options.host, options.port, options.path];
+    });
+
+    (tmp.protocol === 'https:' ? https : http).get(options, function (res) {
+        res.setEncoding('utf8');
+
+        var body = '';
+        res.on('data', function (chunk) {
+            body += chunk;
+        });
+
+        res.on('end', function () {
+            dtp.fire('http-get-done', function () {
+                return [
+                    did,
+                    res.statusCode,
+                    res.headers['content-type'] || null,
+                    res.headers['content-length'] || 0
+                ];
+            });
+            console.log('HTTP/1.1 %d %s',
+                        res.statusCode,
+                        http.STATUS_CODES[res.statusCode]);
+
+            Object.keys(res.headers).forEach(function (k) {
+                console.log('%s: %s', k, res.headers[k]);
+            });
+
+            console.log('\n%s', body);
+        });
+
+    }).on('error', function (e) {
+        dtp.fire('http-get-error', function () {
+            return [did, e.message];
+        });
+    });
+}
+
+if (process.argv.length < 3) {
+    console.error('nurl <url>');
+    process.exit(1);
+}
+
+
+return get(process.argv[2]);

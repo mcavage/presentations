@@ -1,0 +1,397 @@
+<html>
+  <head lang="en-US">
+
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=1024, user-scalable=no" />
+
+    <title>DTrace Your Node.js Applications</title>
+
+    <link rel="stylesheet" href="deck.js/core/deck.core.css">
+    <link rel="stylesheet" href="deck.js/extensions/goto/deck.goto.css">
+    <link rel="stylesheet" href="deck.js/extensions/menu/deck.menu.css">
+    <link rel="stylesheet" href="deck.js/extensions/navigation/deck.navigation.css">
+    <link rel="stylesheet" href="deck.js/extensions/status/deck.status.css">
+    <link rel="stylesheet" href="deck.js/extensions/hash/deck.hash.css">
+
+    <link rel="stylesheet" href="deck.js/themes/style/swiss.css">
+    <link rel="stylesheet" href="deck.js/extensions/codemirror/deck.codemirror.css">
+    <link rel="stylesheet" href="deck.js/extensions/codemirror/themes/default.css">
+
+    <link rel="stylesheet" id="transition-theme-link" href="deck.js/themes/transition/horizontal-slide.css">
+
+    <link rel="stylesheet" href="index.css">
+    <script src="deck.js/modernizr.custom.js"></script>
+  </head>
+  <body>
+    <article class="deck-container">
+
+      <section class="slide" id="intro">
+        <h1 id="title">
+	  <a class="titlelink" href="http://dtrace.org">DTrace</a>
+          Your
+          <a class="titlelink" href="http://nodejs.org">Node.js</a>
+          JS
+	</h1>
+        <h2></h2>
+	<h3><a href="https://twitter.com/mcavage">Mark Cavage</a></h3>
+	<h3><a href="http://wiki.smartos.org/display/DOC/dtrace.conf">dtrace.conf</a>
+          April 03, 2012</h3>
+      </section>
+
+
+      <section class="slide" id="whatisnode1">
+        <h2>Just to level-set (i.e., What's Node.js?)</h2>
+        <ul>
+          <li>Event driven platform...</li>
+        </ul>
+      </section>
+
+      <section class="slide" id="whatisnode2">
+        <h2>Just to level-set (i.e., What's Node.js?)</h2>
+        <ul>
+          <li>Event driven platform...</li>
+          <li>Where your server code is Javascript...</li>
+        </ul>
+      </section>
+
+      <section class="slide" id="whatisnode3">
+        <h2>Just to level-set (i.e., What's Node.js?)</h2>
+        <ul>
+          <li>Event driven platform...</li>
+          <li>Where your server code is Javascript...</li>
+          <li>And networking/HTTP are first class</li>
+        </ul>
+      </section>
+
+      <section class="slide" id="supposeyouhadanodeapp">
+        <h2>Suppose you had some REST api...</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="javascript"
+                    style="display: none;">
+var server = require('restify').createServer({
+    name: 'foo'
+});
+
+server.use(function slowDown(req, res, next) {
+    setTimeout(function () {
+        return next();
+    }, 513);
+});
+
+server.get('/hello/:name', function echo(req, res, next) {
+    res.send('hello ' + req.params.name);
+    return next();
+});
+
+server.listen(8080, function() {
+    console.log('%s listening at %s', server.name, server.url);
+});
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="seethesleep">
+        <h2>Wouldn't it be nice to see that slowdown?</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+#!/usr/sbin/dtrace -s
+#pragma D option quiet
+
+foo*:::get*-*-start
+{
+    tracker[arg0, substr(probename, 0, rindex(probename, "-"))] = timestamp;
+}
+
+foo*:::get*-*-done
+/tracker[arg0, substr(probename, 0, rindex(probename, "-"))]/
+{
+    this->name = substr(probename, 0, rindex(probename, "-"));
+    @[this->name] = quantize(((timestamp - tracker[arg0, this->name]) / 1000000));
+    tracker[arg0, substr(probename, 0, rindex(probename, "-"))] = 0;
+}
+
+          </textarea>
+        </div>
+      </section>
+
+      <section class="slide" id="seethesleep2">
+        <h2>In action</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+$ ./latency.d
+...
+$ curl -s http://localhost:8080/hello/dtrace | json
+hello dtrace
+$ curl -s http://localhost:8080/hello/dtrace | json
+hello dtrace
+...
+  gethelloname-echo
+           value  ------------- Distribution ------------- count
+               0 |                                         0
+               1 |@@@@@@@@@@@@@@@@@@@@                     1
+               2 |@@@@@@@@@@@@@@@@@@@@                     1
+               4 |                                         0
+
+  gethelloname-slowDown
+           value  ------------- Distribution ------------- count
+             256 |                                         0
+             512 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 2
+            1024 |                                         0
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="thanks_chris_andrews">
+        <h2>Thanks <a href="https://github.com/chrisa">Chris Andrews</a>!</h2>
+        <h3>$ npm install dtrace-provider</h3>
+        <ul>
+          <li>Allows you to define DTrace USDT probes on the fly in JS</li>
+          <li>You create probes dynamically, on the fly.  Library generates the
+            DOF and ioctl's it down when you enable the provider.</li>
+          <li>This is the third time he's done it.  Used the same technique
+            for <a href="http://ruby-dtrace.rubyforge.org/">Ruby</a> and
+            <a href="http://search.cpan.org/~chrisa/Devel-DTrace-Provider-0.02/lib/Devel/DTrace/Provider.pm">
+              Perl</a></li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id ="howdoiuseit">
+        <h2>How do you use it?</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="javascript"
+                    style="display: none;">
+var fs = require('fs');
+var dtp = require('dtrace-provider').createDTraceProvider('nodecat');
+
+dtp.addProbe('fs-read-start', 'char *');
+dtp.addProbe('fs-read-done', 'char *', 'char *', 'int');
+
+function readFile(file) {
+    dtp.fire('fs-read-start', function () {
+        return [file]
+    });
+    fs.readFile(file, 'utf8', function (e, data) {
+        dtp.fire('fs-read-done', function () {
+            return [file, e && e.code ? e.code : null, data ? data.length : 0];
+        });
+        if (e)
+            throw e;
+        process.stdout.write(data);
+    });
+}
+
+dtp.enable();
+process.argv.slice(2).forEach(function (f) {
+    return readFile(f);
+});
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="nodeoverhead">
+        <h2>Node's read vs system read</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+nodecat*:::fs-read-start
+{
+    node[copyinstr(arg0)] = timestamp;
+}
+
+
+syscall::open:entry
+/node[substr(copyinstr(arg0), (rindex(copyinstr(arg0), "/") + 1), 128)]/
+{
+    this->fname = substr(copyinstr(arg0),rindex(copyinstr(arg0),"/")+1,128);
+    sys[strjoin("_", this->fname)] = timestamp;
+}
+
+
+syscall::read:entry
+/node[fds[arg0].fi_name] && sys[strjoin("_", fds[arg0].fi_name)]/
+{
+    self->fd = arg0;
+}
+
+syscall::read:return
+/self->fd > 0 && arg0 == 0 && !sys[fds[self->fd].fi_name]/
+{
+    this->fname = fds[self->fd].fi_name;
+    sys[this->fname] = (timestamp - sys[strjoin("_", this->fname)]) / 1000;
+    sys[strjoin("_", this->fname)] = self->fd = 0;
+}
+
+
+nodecat*:::fs-read-done
+/node[copyinstr(arg0)] && sys[copyinstr(arg0)]/
+{
+    this->fname = copyinstr(arg0);
+    this->delta = (timestamp - node[this->fname]) / 1000;
+    printf("%-20s\t%-16d\t%-16d\n", this->fname, sys[this->fname], this->delta);
+    node[this->fname] = sys[this->fname] = 0;
+}
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="sometips1">
+        <h2>A few tips</h2>
+        <ul>
+          <li>Whenever possible, piggyback on system probes by using an
+            argument you can correlate (like filename in the example)</li>
+          <li>There's no support for argument structs (yet), and you only get 6
+            arguments to play with, so choose your args carefully</li>
+          <li>Build DTrace into your framework(s) if possible.
+            <a href="http://ldapjs.org">ldapjs</a> and
+            <a href="http://mcavage.github.com/node-restify">restify</a> are
+            two examples where DTrace isn't in user code at all, but provides
+            enormous value.
+        </ul>
+      </section>
+
+
+      <section class="slide" id="sometips2">
+        <h2>A few (more) tips</h2>
+        <ul>
+          <li>For any given probe, add -start and -done so latency can be
+            calculated</li>
+          <li>Where it makes sense, make arg0 be a monotonically increasing
+            integer</li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="restify">
+        <h2>Recall the initial example</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="javascript"
+                    style="display: none;">
+var server = require('restify').createServer({
+    name: 'foo'
+});
+
+server.use(function slowDown(req, res, next) {
+    setTimeout(function () {
+        return next();
+    }, 513);
+});
+
+server.get('/hello/:name', function echo(req, res, next) {
+    res.send('hello ' + req.params.name);
+    return next();
+});
+
+server.listen(8080, function() {
+    console.log('%s listening at %s', server.name, server.url);
+});
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="restify_mount">
+        <h2>Every time a mapping is added...</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="javascript"
+                    style="display: none;">
+function addProbes(dtrace, name) {
+
+  // id, requestid, authenticated user, user-agent, content-type, content-length
+  dtrace.addProbe(name + '-start',
+                  'int', 'char *', 'char *', 'char *', 'char *', 'int');
+
+  // id, requestid, statusCode, content-type, content-length
+  dtrace.addProbe(name + '-done',
+                  'int', 'char *', 'int', 'char *', 'int', 'int');
+
+  return true;
+}
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="restify_chain">
+        <h2>Every time a route is run...</h2>
+        <ul>
+          <li>arg0 is the socket fd (equal to Node's HTTP DTrace probes)</li>
+          <li>arg1 is a (string) request id that matches application logs</li>
+          <li>The rest are all (useful) HTTP datums</li>
+        </ul>
+      </section>
+
+      <section class="slide" id="andwiththat">
+        <h2>And with that...</h2>
+        <img src="images/all_the_things.jpg" />
+      </section>
+
+
+      <section class="slide" id="endoftalk">
+        <h2>Questions?</h2>
+	<img src="images/questions.jpg" />
+      </section>
+
+      <a href="#" class="deck-prev-link" title="Previous">&#8592;</a>
+      <a href="#" class="deck-next-link" title="Next">&#8594;</a>
+
+      <p class="deck-status">
+        <span class="deck-status-current"></span>
+        /
+        <span class="deck-status-total"></span>
+      </p>
+
+      <form action="." method="get" class="goto-form">
+        <label for="goto-slide">Go to slide:</label>
+        <input type="number" name="slidenum" id="goto-slide">
+        <input type="submit" value="Go">
+      </form>
+
+      <a href="." title="Permalink to this slide" class="deck-permalink">#</a>
+    </article>
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.js"></script>
+    <script>window.jQuery || document.write('<script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.6.1.min.js">\x3C/script>')</script>
+
+<!-- Deck Core and extensions -->
+<script src="deck.js/core/deck.core.js"></script>
+<script src="deck.js/extensions/menu/deck.menu.js"></script>
+<script src="deck.js/extensions/goto/deck.goto.js"></script>
+<script src="deck.js/extensions/status/deck.status.js"></script>
+<script src="deck.js/extensions/navigation/deck.navigation.js"></script>
+<script src="deck.js/extensions/hash/deck.hash.js"></script>
+
+<!-- include the base codemirror code. -->
+<script src="deck.js/extensions/codemirror/codemirror.js"></script>
+
+<!-- include the code syntax you want to highlight -->
+<script src="deck.js/extensions/codemirror/mode/javascript/javascript.js"></script>
+<script src="deck.js/extensions/codemirror/mode/yaml/yaml.js"></script>
+
+<script src="deck.js/extensions/codemirror/deck.codemirror.js"></script>
+
+<!-- Stuff specific to this page -->
+<script src="index.js"></script>
+
+</body>
+</html>
