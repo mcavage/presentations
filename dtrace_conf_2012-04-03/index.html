@@ -39,32 +39,100 @@
       </section>
 
 
-      <section class="slide" id="whatisnode1">
-        <h2>Just to level-set (i.e., What's Node.js?)</h2>
+      <section class="slide" id="aboutme">
+        <h2>Me</h2>
         <ul>
-          <li>Event driven platform...</li>
+          <li><a href="https://twitter.com/mcavage">@mcavage (Twitter)</a></li>
+          <li><a href="https://github.com/mcavage">mcavage (GitHub)</a></li>
+          <li>mcavage at gmail dot com</li>
         </ul>
       </section>
 
-      <section class="slide" id="whatisnode2">
+
+      <section class="slide" id="whatisnode">
         <h2>Just to level-set (i.e., What's Node.js?)</h2>
-        <ul>
-          <li>Event driven platform...</li>
-          <li>Where your server code is Javascript...</li>
-        </ul>
+        <img src="images/nodejs-light.jpg" />
       </section>
 
-      <section class="slide" id="whatisnode3">
-        <h2>Just to level-set (i.e., What's Node.js?)</h2>
+
+      <section class="slide" id="whatisnodejs">
+        <h2>What's Node.js?)</h2>
         <ul>
-          <li>Event driven platform...</li>
-          <li>Where your server code is Javascript...</li>
+          <li>Server-side Javascript.</li>
+          <li>Always non-blocking (threads aren't exposed to you)</li>
           <li>And networking/HTTP are first class</li>
         </ul>
       </section>
 
+
+      <section class="slide" id="whynode">
+        <h2>Why would you use Node.js?</h2>
+        <ul>
+          <li>You want to spin up some new network service (relatively) quickly</li>
+          <li>You want it to talk to other things</li>
+          <li>And you care about performance/scalability</li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="agenda">
+        <h2>Bored now. What's this talk about?</h2>
+        <ul>
+          <li>(Briefly) What DTrace is available for node itself</li>
+          <li>How to DTrace your application with node-dtrace-provider</li>
+          <li>Some example usage of dtrace-provider (restify)</li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="dtraceinnode">
+        <h2>DTrace the Node core</h2>
+        <ul>
+          <li>Basically, you've got USDT probes for socket, http and gc</li>
+          <li>Those let you get the basics of what your app is doing</li>
+          <li>But it's a pretty course granularity</li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="dtracenode">
+        <h2>Some One-liners (thanks @bmc)</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+dtrace -n node*:::http-server-request{
+    printf(“%s of %s from %s\n”, args[0]->method,
+        args[0]->url, args[1]->remoteAddress)}
+
+ dtrace -n http-server-request’{@[args[1]->remoteAddress] = count()}‘
+
+ dtrace -n gc-start’{self->ts = timestamp}’ \
+    -n gc-done’/self->ts/{@ = quantize(timestamp - self->ts)}
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="aboutme">
+        <h2>Cool - do I need anything else?</h2>
+        <ul>
+          <li>As said before, those probes tell you a lot about what the interpreter sees</li>
+          <li>They don't tell you much about your app's <i>components</i></li>
+          <li>Wouldn't you like to know if say a DB call or a FS call were what was slowing your app down?</li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="spaghetti">
+        <h2>Probably</h2>
+        <img src="images/soa-spaghetti.jpg" />
+      </section>
+
+
       <section class="slide" id="supposeyouhadanodeapp">
-        <h2>Suppose you had some REST api...</h2>
+        <h2>Suppose you had some (crappy) REST api...</h2>
         <div>
           <textarea class="code"
                     name="code"
@@ -120,6 +188,7 @@ foo*:::get*-*-done
         </div>
       </section>
 
+
       <section class="slide" id="seethesleep2">
         <h2>In action</h2>
         <div>
@@ -151,17 +220,38 @@ hello dtrace
       </section>
 
 
+      <section class="slide" id="whatjusthappened">
+        <h2>Wait. What?</h2>
+        <ul>
+          <li>There was some magic in <a href="https://github.com/mcavage/node-restify">restify</a></li>
+          <li>Under the covers it creates DTrace probes for all the handlers in a server</li>
+          <li>The rest of this talk is about showing you how to do that</li>
+        </ul>
+      </section>
+
+
       <section class="slide" id="thanks_chris_andrews">
         <h2>Thanks <a href="https://github.com/chrisa">Chris Andrews</a>!</h2>
         <h3>$ npm install dtrace-provider</h3>
         <ul>
+          <li>Allows you to create DTrace providers for your Node.js applications</li>
+          <li>You don't need to be root</li>
+          <li>Installs everywhere; useful on Solaris derivations/OSX</li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="dtrace_node_provider">
+        <h2>What is node-dtrace-provider?</h2>
+        <ul>
           <li>Allows you to define DTrace USDT probes on the fly in JS</li>
-          <li>You create probes dynamically, on the fly.  Library generates the
-            DOF and ioctl's it down when you enable the provider.</li>
           <li>This is the third time he's done it.  Used the same technique
             for <a href="http://ruby-dtrace.rubyforge.org/">Ruby</a> and
             <a href="http://search.cpan.org/~chrisa/Devel-DTrace-Provider-0.02/lib/Devel/DTrace/Provider.pm">
               Perl</a></li>
+          <li>He's currently "normalizing" all three implementations into
+            <a href="https://github.com/chrisa/libusdt">libusdt</a>. More on
+            that later...</li>
         </ul>
       </section>
 
@@ -202,6 +292,52 @@ process.argv.slice(2).forEach(function (f) {
       </section>
 
 
+      <section class="slide" id="howdoesitwork">
+        <h2>Really? How does this work?</h2>
+        <ul>
+          <li>Dynamically create a tracepoints in the running process</li>
+          <li>Dynamically creates DOF to describe the provider to the kernel</li>
+          <li>ioctl said DOF into the kernel</li>
+          <li>For more information,
+          see <a href="http://chrisa.github.com/blog/2011/12/04/libusdt-runtime-dtrace-providers/">Chris' blog</a></li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id ="nodecat">
+        <h2>So, how good are you nodecat?</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="javascript"
+                    style="display: none;">
+var fs = require('fs');
+var dtp = require('dtrace-provider').createDTraceProvider('nodecat');
+
+dtp.addProbe('fs-read-start', 'char *');
+dtp.addProbe('fs-read-done', 'char *', 'char *', 'int');
+
+function readFile(file) {
+    dtp.fire('fs-read-start', function () {
+        return [file]
+    });
+    fs.readFile(file, 'utf8', function (e, data) {
+        dtp.fire('fs-read-done', function () {
+            return [file, e && e.code ? e.code : null, data ? data.length : 0];
+        });
+        if (e)
+            throw e;
+        process.stdout.write(data);
+    });
+}
+
+dtp.enable();
+process.argv.slice(2).forEach(function (f) {
+    return readFile(f);
+});
+          </textarea>
+        </div>
+      </section>
       <section class="slide" id="nodeoverhead">
         <h2>Node's read vs system read</h2>
         <div>
@@ -251,29 +387,138 @@ nodecat*:::fs-read-done
       </section>
 
 
-      <section class="slide" id="sometips1">
-        <h2>A few tips</h2>
+      <section class="slide" id="aboutme">
+        <h2>Pretty decent in terms of interpreter overhead (μs)</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+$ ./nodecat.d
+FILE                	SYSTEM TIME     	NODE TIME
+intro.js            	17693           	18032
+nurl                	33436           	33726
+latency.d           	1006            	1456
+^C
+          </textarea>
+          </div>
+      </section>
+
+
+      <section class="slide" id="wtfisthatreadreturnabout">
+        <h2>(Tangent) What's with the goofy read:return?</h2>
         <ul>
-          <li>Whenever possible, piggyback on system probes by using an
-            argument you can correlate (like filename in the example)</li>
-          <li>There's no support for argument structs (yet), and you only get 6
-            arguments to play with, so choose your args carefully</li>
-          <li>Build DTrace into your framework(s) if possible.
-            <a href="http://ldapjs.org">ldapjs</a> and
-            <a href="http://mcavage.github.com/node-restify">restify</a> are
-            two examples where DTrace isn't in user code at all, but provides
-            enormous value.
+          <li>man -s 2 read says if (read(fd) == 0) then EOF</li>
+          <li>node however decides to keep calling it. and calling it. and
+          calling it.</li>
+          <li>Hence, that janky D script to get the timing of
+            the <i>first</i> return 0 (since the system is ready to move on)</li>
         </ul>
       </section>
 
 
-      <section class="slide" id="sometips2">
-        <h2>A few (more) tips</h2>
+      <section class="slide" id="howdoiuseitreprise">
+        <h2>Bah! Show me some examples!</h2>
         <ul>
-          <li>For any given probe, add -start and -done so latency can be
-            calculated</li>
-          <li>Where it makes sense, make arg0 be a monotonically increasing
-            integer</li>
+          <li>Ok, ok. Clearly the availability heuristic is going to kick
+            in...now!</li>
+          <li>Let's look at:
+            <ul>
+              <li><a href="http://ldapjs.org/">ldapjs</a></li>
+              <li><a href="http://mcavage.github.com/node-restify">restify</a></li>
+            </ul>
+          </li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="ldapjs">
+        <h2>ldapjs: hello world server</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="javascript"
+                    style="display: none;">
+var server = require('ldap').createServer();
+
+server.search('o=example', function(req, res, next) {
+    var obj = {
+        dn: req.dn.toString(),
+        attributes: {
+            o: 'example',
+            objectclass: ['organization', 'top']
+        }
+    };
+
+    if (req.filter.matches(obj.attributes))
+        res.send(obj);
+
+    res.end();
+});
+
+server.listen(1389);
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="ldapjsdtraceprobes">
+        <h2>Show me the probes!</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+$ dtrace -l -P ldapjs*
+   ID   PROVIDER            MODULE                          FUNCTION NAME
+...
+21618 ldapjs70778            module                              func server-search-start
+21619 ldapjs70778            module                              func server-search-done
+21620 ldapjs70778            module                              func server-search-entry
+...
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="ldapjsoneliners">
+        <h2>Some search one(ish) liners</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+dtrace -n "ldapjs*:::server-search-start{printf(\"search: base=%s, \
+    filter=%s from %s\n\", copyinstr(arg3), copyinstr(arg5), \
+    copyinstr(arg1));}"
+          </textarea>
+        </div>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+ldapjs*:::server-search-start
+{
+    req[arg0] = timestamp;
+}
+
+
+ldapjs*:::server-search-done
+/req[arg0]/
+{
+    @search = quantize(((timestamp - req[arg0]) / 1000000));
+}
+          </textarea>
+        </div>
+      </section>
+
+      <section class="slide" id="myfirstpass">
+        <h2>Pretty course granularity</h2>
+        <ul>
+          <li>This was my first pass at integrating dtrace into node app code.</li>
+          <li>Note we really just get start/done for each LDAP operation</li>
+          <li>Lets us see what a server is doing, but not very well broken out</li>
         </ul>
       </section>
 
@@ -332,12 +577,100 @@ function addProbes(dtrace, name) {
       </section>
 
 
-      <section class="slide" id="restify_chain">
-        <h2>Every time a route is run...</h2>
+      <section class="slide" id="restifyrunning">
+        <h2>And the runner for a route looks like...</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="javascript"
+                    style="display: none;">
+function run(req, res) {
+    var chain = this.chain;
+    var i = -1;
+    var self = this;
+
+    function next() {
+        if ((i + 1) > 0 && chain[i]) // handler done
+            fireProbeDone(self.dtrace, self.probe + '-' + chain[i]._name, req, res);
+
+        if (!done && chain[++i]) {
+            fireProbeStart(self.dtrace, self.probe + '-' + chain[i]._name, req);
+            return chain[i].call(self, req, res, next);
+        }
+
+        // route done
+        fireProbeDone(self.dtrace, self.probe, req, res);
+    }
+
+    fireProbeStart(this.dtrace, this.probe, req);
+    return next();
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="protip">
+        <h2>Some tips on how to use dtrace-provider...</h2>
+        <img src="images/protip.jpg" />
+      </section>
+
+
+      <section class="slide" id="piggyback">
+        <h2>Piggy-back on other DTrace probe arguments</h2>
+        <img src="images/piggybackride.jpg" />
+        <p>Whenever possible, piggyback on system probes by using an argument you can correlate (like filename in the nodecat example)</p>
+      </section>
+
+
+      <section class="slide" id="choosewisely">
+        <h2>You have a limited number of arguments, so</h2>
+        <img src="images/grailknight.jpg" />
+        <p>There's no support for argument structs (yet), and you only get 6
+          arguments to play with, so choose your args wisely</p>
+      </section>
+
+
+      <section class="slide" id="dtracetheframework">
+        <h2>Build DTrace into your framework</h2>
+        <img src="images/bike.jpg" />
+        <p><a href="http://ldapjs.org">ldapjs</a> and <a href="http://mcavage.github.com/node-restify">restify</a> are
+          two examples where DTrace isn't in user code at all, but provides
+          substantial value.</p>
+        <li>Most nodey things end up in a control-flow problem</li>
+        <li>I.e., everybody I know
+          uses <a href="https://github.com/caolan/async">async</a> or a
+          home-grown thing like it.</li>
+        <li>But that makes an <i>excellent</i> place to put probes.</li>
+      </section>
+
+
+      <section class="slide" id="startdone">
+        <h2>Enable latency tracking (easily)</h2>
         <ul>
-          <li>arg0 is the socket fd (equal to Node's HTTP DTrace probes)</li>
-          <li>arg1 is a (string) request id that matches application logs</li>
-          <li>The rest are all (useful) HTTP datums</li>
+          <li>For any given probe, add -start and -done so latency can be
+            calculated</li>
+          <li>Where it makes sense, make arg0 be a monotonically increasing
+            integer</li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="libusdt">
+        <h2>So, what about libusdt again?</h2>
+        <ul>
+          <li>Right, so Chris is almost done factoring everything into libusdt</li>
+          <li>After that, it'll be available for others to build on</li>
+          <li>And new features will show up faster in ruby/perl/node</li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="future">
+        <h2>What would be nice in the future?</h2>
+        <ul>
+          <li>JS objects as probe arguments (i.e., structs)</li>
+          <li>Being able to tack on more probes on the fly (i.e., after calling enable())</li>
+          <li>Minimizing the disabled probe effect</li>
         </ul>
       </section>
 
