@@ -246,8 +246,7 @@ hello dtrace
             <a href="http://search.cpan.org/~chrisa/Devel-DTrace-Provider-0.02/lib/Devel/DTrace/Provider.pm">
               Perl</a></li>
           <li>He's currently "normalizing" all three implementations into
-            <a href="https://github.com/chrisa/libusdt">libusdt</a>. More on
-            that later...</li>
+            <a href="https://github.com/chrisa/libusdt">libusdt</a>.
         </ul>
       </section>
 
@@ -570,13 +569,12 @@ server.listen(8080);
 
 
       <section class="slide" id="nowweretalking">
-        <h2>Now we're talking!</h2>a
+        <h2>Now we're talking!</h2>
         <div>
           <textarea class="code"
                     name="code"
                     mode="clike"
                     style="display: none;">
-dtrace -lP restify*
    ID   PROVIDER            MODULE                          FUNCTION NAME
 21688 restify88193            module                              func gethelloname-start
 21689 restify88193            module                              func gethelloname-done
