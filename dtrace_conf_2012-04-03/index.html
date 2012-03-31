@@ -56,7 +56,7 @@
 
 
       <section class="slide" id="whatisnodejs">
-        <h2>What's Node.js?)</h2>
+        <h2>What's Node.js?</h2>
         <ul>
           <li>Server-side Javascript.</li>
           <li>Always non-blocking (threads aren't exposed to you)</li>
@@ -126,7 +126,7 @@ dtrace -n node*:::http-server-request{
 
 
       <section class="slide" id="spaghetti">
-        <h2>Probably</h2>
+        <h2>What if your infrastructure looks like this?</h2>
         <img src="images/soa-spaghetti.jpg" />
       </section>
 
@@ -168,9 +168,6 @@ server.listen(8080, function() {
                     name="code"
                     mode="clike"
                     style="display: none;">
-#!/usr/sbin/dtrace -s
-#pragma D option quiet
-
 foo*:::get*-*-start
 {
     tracker[arg0, substr(probename, 0, rindex(probename, "-"))] = timestamp;
@@ -183,14 +180,13 @@ foo*:::get*-*-done
     @[this->name] = quantize(((timestamp - tracker[arg0, this->name]) / 1000000));
     tracker[arg0, substr(probename, 0, rindex(probename, "-"))] = 0;
 }
-
           </textarea>
         </div>
       </section>
 
 
       <section class="slide" id="seethesleep2">
-        <h2>In action</h2>
+        <h2>In action?</h2>
         <div>
           <textarea class="code"
                     name="code"
@@ -234,9 +230,9 @@ hello dtrace
         <h2>Thanks <a href="https://github.com/chrisa">Chris Andrews</a>!</h2>
         <h3>$ npm install dtrace-provider</h3>
         <ul>
-          <li>Allows you to create DTrace providers for your Node.js applications</li>
-          <li>You don't need to be root</li>
+          <li>Allows you to DTrace for your Node.js application code</li>
           <li>Installs everywhere; useful on Solaris derivations/OSX</li>
+          <li>You don't need to be root</li>
         </ul>
       </section>
 
@@ -293,13 +289,13 @@ process.argv.slice(2).forEach(function (f) {
 
 
       <section class="slide" id="howdoesitwork">
-        <h2>Really? How does this work?</h2>
+        <h2>Is this magic? How does this work?</h2>
         <ul>
-          <li>Dynamically create a tracepoints in the running process</li>
+          <li>Dynamically create tracepoints in the running process</li>
           <li>Dynamically creates DOF to describe the provider to the kernel</li>
           <li>ioctl said DOF into the kernel</li>
           <li>For more information,
-          see <a href="http://chrisa.github.com/blog/2011/12/04/libusdt-runtime-dtrace-providers/">Chris' blog</a></li>
+            see <a href="http://chrisa.github.com/blog/2011/12/04/libusdt-runtime-dtrace-providers/">Chris' blog</a></li>
         </ul>
       </section>
 
@@ -513,48 +509,181 @@ ldapjs*:::server-search-done
         </div>
       </section>
 
+
+      <section class="slide" id="ldapopsportal">
+        <h2>Fancy: Visualization of ldapjs</h2>
+        <img src="images/ldapjs_ops_portal.jpg" />
+      </section>
+
+
       <section class="slide" id="myfirstpass">
-        <h2>Pretty course granularity</h2>
+        <h2>That said: it's pretty course granularity</h2>
         <ul>
           <li>This was my first pass at integrating dtrace into node app code.</li>
-          <li>Note we really just get start/done for each LDAP operation</li>
+          <li>Really there's just start/done for each LDAP operation</li>
           <li>Lets us see what a server is doing, but not very well broken out</li>
         </ul>
       </section>
 
 
-      <section class="slide" id="restify">
-        <h2>Recall the initial example</h2>
+      <section class="slide" id="restifyexplained">
+        <h2>Take two: restify</h2>
+        <ul>
+          <li>Restify lets you build a REST api by pipelining handlers</li>
+          <li>After having done ldapjs, what I really wanted was to be able to
+          visualize all the steps in a request</li>
+          <li>DTrace start/done probes get inserted for <i>every</i> distinct
+            handler</li>
+        </ul>
+      </section>
+
+
+      <section class="slide" id="restifyexamplebetter">
+        <h2>A (slightly) bigger exampe</h2>
         <div>
           <textarea class="code"
                     name="code"
                     mode="javascript"
                     style="display: none;">
-var server = require('restify').createServer({
-    name: 'foo'
-});
+var restify = require('restify');
+var server = restify.createServer();
+server.use(restify.acceptParser(server.acceptable));
+server.use(restify.authorizationParser());
+server.use(restify.dateParser());
+server.use(restify.queryParser());
+server.use(restify.urlEncodedBodyParser());
 
-server.use(function slowDown(req, res, next) {
-    setTimeout(function () {
-        return next();
-    }, 513);
+server.use(function slowHandler(req, res, next) {
+  setTimeout(function() { return next(); }, 513);
 });
 
 server.get('/hello/:name', function echo(req, res, next) {
-    res.send('hello ' + req.params.name);
-    return next();
+  res.send({
+    hello: req.params.name
+  });
 });
 
-server.listen(8080, function() {
-    console.log('%s listening at %s', server.name, server.url);
-});
+server.listen(8080);
           </textarea>
         </div>
       </section>
 
 
+      <section class="slide" id="nowweretalking">
+        <h2>Now we're talking!</h2>a
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+dtrace -lP restify*
+   ID   PROVIDER            MODULE                          FUNCTION NAME
+21688 restify88193            module                              func gethelloname-start
+21689 restify88193            module                              func gethelloname-done
+21690 restify88193            module                              func gethelloname-parseAccept-start
+21691 restify88193            module                              func gethelloname-parseAccept-done
+21692 restify88193            module                              func gethelloname-parseAuthorization-start
+21693 restify88193            module                              func gethelloname-parseAuthorization-done
+21694 restify88193            module                              func gethelloname-parseDate-start
+21695 restify88193            module                              func gethelloname-parseDate-done
+21696 restify88193            module                              func gethelloname-parseQueryString-start
+21697 restify88193            module                              func gethelloname-parseQueryString-done
+21698 restify88193            module                              func gethelloname-parseUrlEncodedBody-start
+21699 restify88193            module                              func gethelloname-parseUrlEncodedBody-done
+21700 restify88193            module                              func gethelloname-slowHandler-start
+21701 restify88193            module                              func gethelloname-slowHandler-done
+21702 restify88193            module                              func gethelloname-echo-start
+21703 restify88193            module                              func gethelloname-echo-done
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="samedscript">
+        <h2>The same D script as before...</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+restify*:::get*-*-start
+{
+    tracker[arg0, substr(probename, 0, rindex(probename, "-"))] = timestamp;
+}
+
+restify*:::get*-*-done
+/tracker[arg0, substr(probename, 0, rindex(probename, "-"))]/
+{
+    this->name = substr(probename, 0, rindex(probename, "-"));
+    @[this->name] = quantize(((timestamp - tracker[arg0, this->name]) / 1000000));
+    tracker[arg0, substr(probename, 0, rindex(probename, "-"))] = 0;
+}
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="moredata">
+        <h2>Shows us a lot more data</h2>
+        <div>
+          <textarea class="code"
+                    name="code"
+                    mode="clike"
+                    style="display: none;">
+  gethelloname-parseAccept
+           value  ------------- Distribution ------------- count
+              -1 |                                         0
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 15
+               1 |                                         0
+
+  gethelloname-parseAuthorization
+           value  ------------- Distribution ------------- count
+              -1 |                                         0
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 15
+               1 |                                         0
+
+  gethelloname-parseDate
+           value  ------------- Distribution ------------- count
+              -1 |                                         0
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 15
+               1 |                                         0
+
+  gethelloname-parseQueryString
+           value  ------------- Distribution ------------- count
+              -1 |                                         0
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 15
+               1 |                                         0
+
+  gethelloname-parseUrlEncodedBody
+           value  ------------- Distribution ------------- count
+              -1 |                                         0
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 15
+               1 |                                         0
+
+  gethelloname-slowHandler
+           value  ------------- Distribution ------------- count
+             256 |                                         0
+             512 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 14
+            1024 |
+          </textarea>
+        </div>
+      </section>
+
+
+      <section class="slide" id="restifyworkslike">
+        <h2>Every time a route/handler is added</h2>
+        <ul>
+          <li>restify sets up a start/done DTrace probe for the route</li>
+          <li>plus a start/done probe for each handler in the route</li>
+          <li>plus a start/done probe for the shared handlers to track in that
+            route</li>
+          <li>You can glob to your heart's content in D scripts, since the names
+            are predictable</li>
+        </ul>
+      </section>
+
       <section class="slide" id="restify_mount">
-        <h2>Every time a mapping is added...</h2>
+        <h2>mapping code</h2>
         <div>
           <textarea class="code"
                     name="code"
@@ -578,7 +707,7 @@ function addProbes(dtrace, name) {
 
 
       <section class="slide" id="restifyrunning">
-        <h2>And the runner for a route looks like...</h2>
+        <h2>Route runner fires</h2>
         <div>
           <textarea class="code"
                     name="code"
@@ -616,14 +745,14 @@ function run(req, res) {
 
 
       <section class="slide" id="piggyback">
-        <h2>Piggy-back on other DTrace probe arguments</h2>
-        <img src="images/piggybackride.jpg" />
+        <h2>Ride on top of other probes</h2>
+        <img src="images/mrt_on_a_unicorn.jpg" />
         <p>Whenever possible, piggyback on system probes by using an argument you can correlate (like filename in the nodecat example)</p>
       </section>
 
 
       <section class="slide" id="choosewisely">
-        <h2>You have a limited number of arguments, so</h2>
+        <h2>Picking arguments</h2>
         <img src="images/grailknight.jpg" />
         <p>There's no support for argument structs (yet), and you only get 6
           arguments to play with, so choose your args wisely</p>
@@ -631,7 +760,7 @@ function run(req, res) {
 
 
       <section class="slide" id="dtracetheframework">
-        <h2>Build DTrace into your framework</h2>
+        <h2>Build into your framework</h2>
         <img src="images/bike.jpg" />
         <p><a href="http://ldapjs.org">ldapjs</a> and <a href="http://mcavage.github.com/node-restify">restify</a> are
           two examples where DTrace isn't in user code at all, but provides
@@ -645,22 +774,12 @@ function run(req, res) {
 
 
       <section class="slide" id="startdone">
-        <h2>Enable latency tracking (easily)</h2>
+        <h2>Easy latency tracking</h2>
         <ul>
           <li>For any given probe, add -start and -done so latency can be
             calculated</li>
           <li>Where it makes sense, make arg0 be a monotonically increasing
             integer</li>
-        </ul>
-      </section>
-
-
-      <section class="slide" id="libusdt">
-        <h2>So, what about libusdt again?</h2>
-        <ul>
-          <li>Right, so Chris is almost done factoring everything into libusdt</li>
-          <li>After that, it'll be available for others to build on</li>
-          <li>And new features will show up faster in ruby/perl/node</li>
         </ul>
       </section>
 
@@ -673,6 +792,7 @@ function run(req, res) {
           <li>Minimizing the disabled probe effect</li>
         </ul>
       </section>
+
 
       <section class="slide" id="andwiththat">
         <h2>And with that...</h2>
