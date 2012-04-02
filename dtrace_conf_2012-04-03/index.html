@@ -80,7 +80,7 @@
         <ul>
           <li>(Briefly) What DTrace is available for node itself</li>
           <li>How to DTrace your application with node-dtrace-provider</li>
-          <li>Some example usage of dtrace-provider (restify)</li>
+          <li>Some example usage of dtrace-provider (ldapjs/restify)</li>
         </ul>
       </section>
 
@@ -250,6 +250,16 @@ hello dtrace
         </ul>
       </section>
 
+      <section class="slide" id="howdoesitwork">
+        <h2>Is this magic? How does this work?</h2>
+        <ul>
+          <li>Dynamically create tracepoints in the running process</li>
+          <li>Dynamically creates DOF to describe the provider to the kernel</li>
+          <li>ioctl said DOF into the kernel</li>
+          <li>For more information,
+            see <a href="http://chrisa.github.com/blog/2011/12/04/libusdt-runtime-dtrace-providers/">Chris' blog</a></li>
+        </ul>
+      </section>
 
       <section class="slide" id ="howdoiuseit">
         <h2>How do you use it?</h2>
@@ -284,18 +294,6 @@ process.argv.slice(2).forEach(function (f) {
 });
           </textarea>
         </div>
-      </section>
-
-
-      <section class="slide" id="howdoesitwork">
-        <h2>Is this magic? How does this work?</h2>
-        <ul>
-          <li>Dynamically create tracepoints in the running process</li>
-          <li>Dynamically creates DOF to describe the provider to the kernel</li>
-          <li>ioctl said DOF into the kernel</li>
-          <li>For more information,
-            see <a href="http://chrisa.github.com/blog/2011/12/04/libusdt-runtime-dtrace-providers/">Chris' blog</a></li>
-        </ul>
       </section>
 
 
